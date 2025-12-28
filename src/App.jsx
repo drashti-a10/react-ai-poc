@@ -1,166 +1,148 @@
-import { useEffect, useRef, useState } from "react";
-import "./App.css";
-import Answer from "./components/Answers";
+import { useState, useRef, useEffect } from "react";
 
 /* ================= MOCK BACKEND ================= */
+let memory = {}; // keep memory outside to persist across calls
 
-// this acts like backend memory (stateful)
-let memory = [];
-
-const mockAgentResponse = (prompt) => {
-  memory.push(prompt);
-
-  return new Promise((resolve) => {
+const mockBackend = async (userMessage) => {
+  return new Promise((resolve, reject) => {
     setTimeout(() => {
-      resolve({
-        reply: `You said: "${prompt}". I remember ${memory.length} messages.`,
-      });
-    }, 1000); // 1 second delay
+      const msg = userMessage.toLowerCase();
+
+      // Calculator example
+      if (msg.includes("calculate") || msg.includes("what is 10 plus 5")) {
+        resolve("Result: 15");
+      } 
+      // Memory save example
+      else if (msg.includes("remember my cat's name is")) {
+        memory["cat_name"] = userMessage.split("is")[1].trim();
+        resolve(`Saved memory: ${memory["cat_name"]}`);
+      } 
+      // Memory read example
+      else if (msg.includes("what is my cat's name")) {
+        if (memory["cat_name"]) {
+          resolve(`Your cat's name is ${memory["cat_name"]}`);
+        } else {
+          resolve("I don't know your cat's name yet.");
+        }
+      } 
+      // Greeting example
+      else if (msg.includes("hello")) {
+        resolve("Hi 👋 How can I help you?");
+      } 
+      // Weather example
+      else if (msg.includes("weather")) {
+        resolve("🌤️ The weather is sunny today.");
+      } 
+      // Fallback
+      else {
+        resolve("Sorry, I didn't understand that.");
+      }
+    }, 800); // fake API delay
   });
 };
 
-/* ================================================ */
+/* ================= APP ================= */
+export default function App() {
+  const [input, setInput] = useState("");
+  const [messages, setMessages] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
 
-function App() {
-  const [question, setQuestion] = useState("");
-  const [result, setResult] = useState([]);
-  const [recentHistory, setRecentHistory] = useState(
-    JSON.parse(localStorage.getItem("history")) || []
-  );
-  const [selectedHistory, setSelectedHistory] = useState("");
-  const [loader, setLoader] = useState(false);
-  const scrollToAns = useRef();
+  const chatRef = useRef(null);
 
-  const askQuestion = async () => {
-    if (!question && !selectedHistory) return;
+  const handleSend = async () => {
+    if (!input.trim()) return;
 
-    const payloadData = question || selectedHistory;
+    setError("");
+    setLoading(true);
 
-    // save history
-    if (question) {
-      const history = recentHistory ? [question, ...recentHistory] : [question];
-      localStorage.setItem("history", JSON.stringify(history));
-      setRecentHistory(history);
-    }
+    // 1️⃣ Add user message immediately
+    const userMessage = { sender: "user", text: input };
+    setMessages((prev) => [...prev, userMessage]);
+    setInput("");
 
-    setLoader(true);
+    try {
+      // 2️⃣ Call mocked backend
+      const reply = await mockBackend(input);
 
-    //  MOCKED BACKEND CALL
-    const response = await mockAgentResponse(payloadData);
-
-    const dataString = [response.reply];
-
-    setResult((prev) => [
-      ...prev,
-      { type: "q", text: payloadData },
-      { type: "a", text: dataString },
-    ]);
-
-    setQuestion("");
-    setSelectedHistory("");
-
-    setTimeout(() => {
-      scrollToAns.current.scrollTop =
-        scrollToAns.current.scrollHeight;
-    }, 300);
-
-    setLoader(false);
-  };
-
-  const clearHistory = () => {
-    localStorage.clear();
-    setRecentHistory([]);
-  };
-
-  const isEnter = (event) => {
-    if (event.key === "Enter") {
-      askQuestion();
+      // 3️⃣ Add agent response
+      setMessages((prev) => [
+        ...prev,
+        { sender: "agent", text: reply },
+      ]);
+    } catch (err) {
+      setError("Something went wrong!");
+    } finally {
+      setLoading(false);
     }
   };
 
+  const handleKeyDown = (e) => {
+    if (e.key === "Enter") handleSend();
+  };
+
+  // Auto scroll to bottom
   useEffect(() => {
-    if (selectedHistory) {
-      askQuestion();
-    }
-  }, [selectedHistory]);
+    chatRef.current?.scrollTo({
+      top: chatRef.current.scrollHeight,
+      behavior: "smooth",
+    });
+  }, [messages, loading]);
 
   return (
-    <div className="grid grid-cols-5 h-screen text-center">
-      {/* LEFT SIDEBAR */}
-      <div className="col-span-1 bg-zinc-800 pt-3">
-        <h1 className="text-xl text-white flex justify-center gap-2">
-          Recent Search
-          <button onClick={clearHistory} className="cursor-pointer">
-            🗑️
-          </button>
-        </h1>
-
-        <ul className="text-left overflow-auto m-5">
-          {recentHistory.map((item, index) => (
-            <li
-              key={index}
-              onClick={() => setSelectedHistory(item)}
-              className="p-2 truncate text-zinc-400 cursor-pointer hover:bg-zinc-700 hover:text-zinc-200"
-            >
-              {item}
-            </li>
-          ))}
-        </ul>
+    <div className="min-h-screen flex flex-col bg-zinc-900 text-white">
+      {/* Header */}
+      <div className="p-4 text-xl font-semibold text-center border-b border-zinc-700">
+        Mini AI Agent (Mock Backend)
       </div>
 
-      {/* CHAT AREA */}
-      <div className="col-span-4 p-10">
-        <h1 className="text-4xl bg-clip-text text-transparent bg-gradient-to-r from-pink-700 to-violet-700">
-          How can I help you?
-        </h1>
+      {/* Chat Area */}
+      <div
+        ref={chatRef}
+        className="flex-1 overflow-y-auto p-4 space-y-4"
+      >
+        {messages.map((msg, index) => (
+          <div
+            key={index}
+            className={`flex ${msg.sender === "user" ? "justify-end" : "justify-start"}`}
+          >
+            <div
+              className={`max-w-[75%] px-4 py-2 rounded-xl break-words ${
+                msg.sender === "user" ? "bg-violet-600" : "bg-zinc-700"
+              }`}
+            >
+              {msg.text}
+            </div>
+          </div>
+        ))}
 
-        {loader && (
-          <p className="text-zinc-400 mt-3">Agent is typing...</p>
+        {loading && (
+          <p className="text-sm text-zinc-400">Agent is typing...</p>
         )}
 
-        <div
-          ref={scrollToAns}
-          className="container h-140 overflow-scroll mt-5"
-        >
-          <ul className="text-zinc-300">
-            {result.map((item, index) => (
-              <div
-                key={index}
-                className={item.type === "q" ? "flex justify-end" : ""}
-              >
-                {item.type === "q" ? (
-                  <li className="p-3 bg-zinc-700 rounded-3xl w-fit">
-                    <Answer ans={item.text} type="q" />
-                  </li>
-                ) : (
-                  item.text.map((ansItem, ansIndex) => (
-                    <li key={ansIndex} className="p-2 text-left">
-                      <Answer ans={ansItem} type="a" />
-                    </li>
-                  ))
-                )}
-              </div>
-            ))}
-          </ul>
-        </div>
+        {error && (
+          <p className="text-sm text-red-500">{error}</p>
+        )}
+      </div>
 
-        {/* INPUT */}
-        <div className="bg-zinc-800 w-1/2 p-2 text-white m-auto rounded-full border border-zinc-700 flex mt-5">
-          <input
-            type="text"
-            value={question}
-            onChange={(e) => setQuestion(e.target.value)}
-            onKeyDown={isEnter}
-            className="w-full p-3 outline-none bg-transparent"
-            placeholder="Ask me anything..."
-          />
-          <button onClick={askQuestion} className="px-4">
-            Ask
-          </button>
-        </div>
+      {/* Input Area */}
+      <div className="p-4 border-t border-zinc-700 flex gap-2">
+        <input
+          type="text"
+          value={input}
+          onChange={(e) => setInput(e.target.value)}
+          onKeyDown={handleKeyDown}
+          placeholder="Ask something..."
+          className="flex-1 px-4 py-2 rounded-lg bg-zinc-800 outline-none"
+        />
+        <button
+          onClick={handleSend}
+          disabled={loading}
+          className="px-5 py-2 bg-violet-600 rounded-lg disabled:opacity-50"
+        >
+          Send
+        </button>
       </div>
     </div>
   );
 }
-
-export default App;
