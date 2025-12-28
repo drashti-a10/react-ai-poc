@@ -7,7 +7,7 @@ The project demonstrates a chat-style UI built using React with a clean and resp
 ## How to Use the Application
 1.Open the application in your browser using the live demo link or by running it locally.
 
-2.You will see a chat window with an empty conversation area when you scroll.
+2.You will see a chat window with an empty conversation area .
 
 3.At the bottom of the screen, there is a chat input box where the user can type a message.
 
