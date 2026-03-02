@@ -1,5 +1,5 @@
-# React AI Chat UI – POC
-This repository contains a **Proof of Concept (POC)** built as part of a Frontend Developer assignment for Baarez.
+# React AI Chat UI 
+This repository contains a built as part of a Frontend Developer .
 The project demonstrates a chat-style UI built using React with a clean and responsive layout.
  This UI will interact with a mocked backend API, simulating the experience of talking to the 
 "Mini-Agent" from the backend POC. 
